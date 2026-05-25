@@ -14,22 +14,18 @@ class EqualizerPage extends StatefulWidget {
 }
 
 class _EqualizerPageState extends State<EqualizerPage> {
-  final _eqService = EqualizerService();
-  String? _activePresetName = 'Flat';
-  bool _enabled = false;
+  final _eqService = EqualizerService.instance;
+  late String? _activePresetName;
+  late bool _enabled;
 
   @override
   void initState() {
     super.initState();
+    _enabled = _eqService.isEnabled;
+    _activePresetName = _eqService.activePresetName ?? 'Flat';
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PlaylistProvider>().loadEqPresets();
     });
-  }
-
-  @override
-  void dispose() {
-    _eqService.dispose();
-    super.dispose();
   }
 
   @override

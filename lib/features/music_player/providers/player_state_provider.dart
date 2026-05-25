@@ -5,6 +5,13 @@ import '../models/playlist.dart';
 import '../services/audio_player_service.dart';
 
 class PlayerStateProvider extends ChangeNotifier {
+  static AudioInterruptMode? _savedInterruptMode;
+  static void Function(AudioInterruptMode)? onInterruptModeChanged;
+
+  static void setDefaultInterruptMode(AudioInterruptMode mode) {
+    _savedInterruptMode = mode;
+  }
+
   final AudioPlayerService _audioService = AudioPlayerService();
   StreamSubscription? _positionSub;
   StreamSubscription? _durationSub;
@@ -43,6 +50,10 @@ class PlayerStateProvider extends ChangeNotifier {
           : 0.0;
 
   PlayerStateProvider() {
+    if (_savedInterruptMode != null) {
+      _interruptMode = _savedInterruptMode!;
+      _audioService.setInterruptMode(_savedInterruptMode!);
+    }
     _stateSub = _audioService.playbackState.listen((state) {
       _isPlaying = state == PlaybackState.playing;
       notifyListeners();
@@ -109,7 +120,12 @@ class PlayerStateProvider extends ChangeNotifier {
   void seek(Duration pos) => _audioService.seek(pos);
   void setVolume(double v) => _audioService.setVolume(v);
   void setPlayMode(PlayMode mode) => _audioService.setPlayMode(mode);
-  void setInterruptMode(AudioInterruptMode mode) => _audioService.setInterruptMode(mode);
+  void setInterruptMode(AudioInterruptMode mode) {
+    _interruptMode = mode;
+    _audioService.setInterruptMode(mode);
+    onInterruptModeChanged?.call(mode);
+    notifyListeners();
+  }
   void moveInQueue(int from, int to) => _audioService.moveTrack(from, to);
   void removeFromQueue(int index) => _audioService.removeFromQueue(index);
   void addToQueue(MusicTrack track) => _audioService.addToQueue(track);

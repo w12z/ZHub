@@ -1,108 +1,108 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
-
-enum AudioDeviceType { bluetooth, speaker, wired, airplay, other }
+import 'package:flutter_soloud/flutter_soloud.dart';
+import 'settings_repository.dart';
 
 class AudioDevice {
-  final String id;
+  final int id;
   final String name;
-  final AudioDeviceType type;
   final bool isActive;
 
   const AudioDevice({
     required this.id,
     required this.name,
-    required this.type,
     this.isActive = false,
   });
 }
 
-abstract class AudioRoutingService {
-  Future<List<AudioDevice>> getDevices();
-  Future<void> switchToDevice(String deviceId);
-  Stream<AudioDevice?> get onDeviceChanged;
-  AudioDevice? get currentDevice;
-  Future<void> dispose();
-}
+class AudioRoutingService {
+  static final AudioRoutingService instance = AudioRoutingService._();
+  AudioRoutingService._();
 
-class DefaultAudioRoutingService extends AudioRoutingService {
+  SettingsRepository? _settings;
   final _deviceChangedController = StreamController<AudioDevice?>.broadcast();
-  AudioDevice? _currentDevice = const AudioDevice(
-    id: 'default',
-    name: '默认输出',
-    type: AudioDeviceType.speaker,
-    isActive: true,
-  );
+  Timer? _pollTimer;
+  int? _activeDeviceId;
 
-  @override
-  AudioDevice? get currentDevice => _currentDevice;
-
-  @override
   Stream<AudioDevice?> get onDeviceChanged => _deviceChangedController.stream;
 
-  @override
-  Future<List<AudioDevice>> getDevices() async {
-    final devices = <AudioDevice>[
-      const AudioDevice(
-        id: 'default',
-        name: '默认输出',
-        type: AudioDeviceType.speaker,
-        isActive: true,
-      ),
-    ];
-
-    if (Platform.isWindows) {
-      devices.addAll(await _getWindowsDevices());
-    }
-
-    return devices;
+  void attachSettings(SettingsRepository settings) {
+    _settings = settings;
   }
 
-  Future<List<AudioDevice>> _getWindowsDevices() async {
+  Future<void> loadFromSettings() async {
+    if (_settings == null) return;
+    final deviceId = await _settings!.getInt('output_device_id');
+    if (deviceId != null) {
+      _activeDeviceId = deviceId;
+    }
+  }
+
+  Future<void> _saveToSettings() async {
+    if (_settings == null) return;
+    if (_activeDeviceId != null) {
+      await _settings!.setInt('output_device_id', _activeDeviceId!);
+    }
+  }
+
+  void startMonitoring() {
+    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      _checkDeviceChanges();
+    });
+  }
+
+  void _checkDeviceChanges() {
     try {
-      // Using win32audio to enumerate devices
-      // For now, return a placeholder list
-      return [
-        const AudioDevice(
-          id: 'speakers',
-          name: '扬声器',
-          type: AudioDeviceType.speaker,
-        ),
-        const AudioDevice(
-          id: 'headphones',
-          name: '耳机',
-          type: AudioDeviceType.wired,
-        ),
-      ];
-    } catch (e) {
-      debugPrint('[AudioRouting] Windows device enumeration failed: $e');
-      return [];
-    }
-  }
-
-  @override
-  Future<void> switchToDevice(String deviceId) async {
-    debugPrint('[AudioRouting] switchToDevice: $deviceId');
-    _currentDevice = AudioDevice(
-      id: deviceId,
-      name: deviceId,
-      type: AudioDeviceType.speaker,
-      isActive: true,
-    );
-    _deviceChangedController.add(_currentDevice);
-
-    if (Platform.isWindows) {
-      try {
-        // Use win32audio to switch default device
-      } catch (e) {
-        debugPrint('[AudioRouting] Windows device switch failed: $e');
+      final devices = listDevices();
+      final active = devices.where((d) => d.isActive).firstOrNull;
+      if (active?.id != _activeDeviceId) {
+        _activeDeviceId = active?.id;
+        _deviceChangedController.add(active);
       }
+    } catch (_) {}
+  }
+
+  List<AudioDevice> listDevices() {
+    final playbackDevices = SoLoud.instance.listPlaybackDevices();
+    // Initialize active device from system default on first call
+    if (_activeDeviceId == null) {
+      final defaultDevice = playbackDevices.firstWhere(
+        (d) => d.isDefault,
+        orElse: () => playbackDevices.first,
+      );
+      _activeDeviceId = defaultDevice.id;
+    }
+    return playbackDevices.map((d) {
+      return AudioDevice(
+        id: d.id,
+        name: d.name,
+        isActive: d.id == _activeDeviceId,
+      );
+    }).toList();
+  }
+
+  Future<void> switchToDevice(int deviceId) async {
+    final devices = SoLoud.instance.listPlaybackDevices();
+    final target = devices.cast<PlaybackDevice?>().firstWhere(
+      (d) => d?.id == deviceId,
+      orElse: () => null,
+    );
+    if (target != null) {
+      _activeDeviceId = deviceId;
+      SoLoud.instance.changeDevice(newDevice: target);
+      await _saveToSettings();
+      debugPrint('[AudioRouting] Switched to: ${target.name} (id: $deviceId)');
     }
   }
 
-  @override
-  Future<void> dispose() async {
-    await _deviceChangedController.close();
+  int? get activeDeviceId => _activeDeviceId;
+
+  void stopMonitoring() {
+    _pollTimer?.cancel();
+  }
+
+  void dispose() {
+    stopMonitoring();
+    _deviceChangedController.close();
   }
 }

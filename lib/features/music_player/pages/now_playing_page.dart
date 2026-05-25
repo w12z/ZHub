@@ -263,52 +263,66 @@ class NowPlayingPage extends StatelessWidget {
     final player = context.read<PlayerStateProvider>();
     showModalBottomSheet(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Text(
-                  '音频打断策略',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              Column(
-                  children: [
-                    RadioListTile<AudioInterruptMode>(
-                      title: const Text('暂停播放'),
-                      subtitle: const Text('其他应用发声时暂停'),
-                      value: AudioInterruptMode.pause,
-                      groupValue: player.interruptMode,
-                      onChanged: (v) {
-                        if (v != null) player.setInterruptMode(v);
-                      },
-                    ),
-                    RadioListTile<AudioInterruptMode>(
-                      title: const Text('降低音量'),
-                      subtitle: const Text('降低音量继续播放'),
-                      value: AudioInterruptMode.duck,
-                      groupValue: player.interruptMode,
-                      onChanged: (v) {
-                        if (v != null) player.setInterruptMode(v);
-                      },
-                    ),
-                    RadioListTile<AudioInterruptMode>(
-                      title: const Text('不中断'),
-                      subtitle: const Text('与其他应用音频混合播放'),
-                      value: AudioInterruptMode.mix,
-                      groupValue: player.interruptMode,
-                      onChanged: (v) {
-                        if (v != null) player.setInterruptMode(v);
-                      },
-                    ),
-                  ],
-              ),
-            ],
-          ),
+      builder: (ctx) => _InterruptModeSheet(player: player),
+    );
+  }
+}
+
+class _InterruptModeSheet extends StatefulWidget {
+  final PlayerStateProvider player;
+  const _InterruptModeSheet({required this.player});
+
+  @override
+  State<_InterruptModeSheet> createState() => _InterruptModeSheetState();
+}
+
+class _InterruptModeSheetState extends State<_InterruptModeSheet> {
+  late AudioInterruptMode _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.player.interruptMode;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text('音频打断策略', style: theme.textTheme.titleMedium),
+            ),
+            RadioListTile<AudioInterruptMode>(
+              title: const Text('暂停播放'),
+              subtitle: const Text('其他应用发声时暂停'),
+              value: AudioInterruptMode.pause,
+              groupValue: _selected,
+              onChanged: (v) {
+                if (v != null) {
+                  setState(() => _selected = v);
+                  widget.player.setInterruptMode(v);
+                }
+              },
+            ),
+            RadioListTile<AudioInterruptMode>(
+              title: const Text('不中断但降低音量'),
+              subtitle: const Text('降低至 20% 音量继续播放'),
+              value: AudioInterruptMode.duck,
+              groupValue: _selected,
+              onChanged: (v) {
+                if (v != null) {
+                  setState(() => _selected = v);
+                  widget.player.setInterruptMode(v);
+                }
+              },
+            ),
+          ],
         ),
       ),
     );

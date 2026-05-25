@@ -3,13 +3,19 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import '../models/playlist.dart';
 import '../models/eq_preset.dart';
+import 'settings_repository.dart';
 
 class PlaylistRepository {
+  static final PlaylistRepository instance = PlaylistRepository._();
+  PlaylistRepository._();
+
   Database? _db;
+  final SettingsRepository settings = SettingsRepository();
 
   Future<Database> get db async {
     if (_db != null) return _db!;
     _db = await _initDatabase();
+    settings.attach(_db!);
     return _db!;
   }
 
@@ -19,9 +25,21 @@ class PlaylistRepository {
 
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS settings (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        )
+      ''');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -60,6 +78,13 @@ class PlaylistRepository {
     await db.execute(
       'CREATE INDEX idx_playlist_tracks_order ON playlist_tracks(playlist_id, sort_order)',
     );
+
+    await db.execute('''
+      CREATE TABLE settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
 
     await _insertDefaultEqPresets(db);
   }

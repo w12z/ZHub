@@ -4,7 +4,7 @@ import '../models/eq_preset.dart';
 import '../services/playlist_repository.dart';
 
 class PlaylistProvider extends ChangeNotifier {
-  final PlaylistRepository _repository = PlaylistRepository();
+  final PlaylistRepository _repository = PlaylistRepository.instance;
 
   List<Playlist> _playlists = [];
   List<EqPreset> _eqPresets = [];

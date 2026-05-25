@@ -2,6 +2,9 @@
 cmake_minimum_required(VERSION 3.14)
 project(file_hub LANGUAGES CXX)
 
+# Suppress verbose CMake configure output from plugins
+set(CMAKE_MESSAGE_LOG_LEVEL WARNING CACHE STRING "" FORCE)
+
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
 set(BINARY_NAME "file_hub")
