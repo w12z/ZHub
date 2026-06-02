@@ -22,7 +22,10 @@ class PdfViewerFeature extends AppFeature {
   String get iconAsset => 'assets/icons/pdf.svg';
 
   @override
-  bool get enabledByDefault => true;
+  IconData get icon => Icons.picture_as_pdf;
+
+  @override
+  bool get enabledByDefault => false;
 
   @override
   Widget buildPage(BuildContext context) {

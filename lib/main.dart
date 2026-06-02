@@ -34,7 +34,11 @@ class ZHubApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => FileBrowserProvider()),
         ChangeNotifierProvider(create: (_) => QuickAccessProvider()),
-        ChangeNotifierProvider(create: (_) => MusicLibraryProvider()),
+        ChangeNotifierProvider(create: (_) {
+          final provider = MusicLibraryProvider();
+          provider.initPrefs();
+          return provider;
+        }),
         ChangeNotifierProvider(create: (_) => PlaylistProvider()),
         ChangeNotifierProvider.value(value: AudioPlayerService.instance),
         ChangeNotifierProvider.value(value: FeatureRegistry()),
@@ -87,8 +91,8 @@ class _HomePageState extends State<HomePage> {
       ),
       for (final f in features)
         NavigationDestination(
-          icon: const Icon(Icons.music_note_outlined),
-          selectedIcon: const Icon(Icons.music_note),
+          icon: Icon(f.icon),
+          selectedIcon: Icon(f.icon),
           label: f.name,
         ),
     ];

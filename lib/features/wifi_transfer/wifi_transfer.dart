@@ -10,6 +10,9 @@ import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart' as shelf_router;
 
+import '../../core/feature_registry.dart';
+import '../music_player/providers/music_library_provider.dart';
+
 export 'wifi_transfer_feature.dart';
 
 // ============================================================
@@ -30,6 +33,7 @@ class TransferTask {
   int bytesTransferred;
   int speed;
   String? error;
+  String? savedPath;
   final DateTime createdAt;
 
   TransferTask({
@@ -42,6 +46,7 @@ class TransferTask {
     this.bytesTransferred = 0,
     this.speed = 0,
     this.error,
+    this.savedPath,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
@@ -167,6 +172,7 @@ class WifiTransferServer {
           fileName: fileKey,
           fileSize: 0,
           direction: TransferDirection.upload,
+          savedPath: file.path,
         );
         _taskController.add(task);
 
@@ -383,6 +389,12 @@ class WifiTransferProvider extends ChangeNotifier {
   String? _error;
   final List<TransferTask> _transfers = [];
 
+  bool sendToMusicFolder = false;
+  String? _musicFolderPath;
+  static const _audioExtensions = [
+    'mp3', 'flac', 'wav', 'aac', 'm4a', 'ogg', 'wma', 'opus', 'aiff'
+  ];
+
   WifiTransferProvider({required WifiTransferServer server})
       : _server = server {
     _server.taskStream.listen(_onTaskUpdate);
@@ -434,6 +446,9 @@ class WifiTransferProvider extends ChangeNotifier {
     } else {
       _transfers.insert(0, task);
     }
+    if (task.status == TransferStatus.completed) {
+      _tryCopyToMusicFolder(task);
+    }
     notifyListeners();
   }
 
@@ -454,6 +469,30 @@ class WifiTransferProvider extends ChangeNotifier {
           t.status == TransferStatus.failed,
     );
     notifyListeners();
+  }
+
+  void setSendToMusicFolder(bool value, String? musicFolderPath) {
+    sendToMusicFolder = value;
+    _musicFolderPath = musicFolderPath;
+    notifyListeners();
+  }
+
+  bool _isAudioFile(String fileName) {
+    final ext = fileName.split('.').last.toLowerCase();
+    return _audioExtensions.contains(ext);
+  }
+
+  void _tryCopyToMusicFolder(TransferTask task) {
+    if (!sendToMusicFolder || _musicFolderPath == null || task.savedPath == null) return;
+    if (!_isAudioFile(task.fileName)) return;
+    try {
+      final sourceFile = File(task.savedPath!);
+      final destDir = Directory(_musicFolderPath!);
+      if (!destDir.existsSync()) destDir.createSync(recursive: true);
+      sourceFile.copySync('${destDir.path}${Platform.pathSeparator}${task.fileName}');
+    } catch (e) {
+      // silently ignore copy failures
+    }
   }
 
   @override
@@ -512,6 +551,7 @@ class _ServerCard extends StatelessWidget {
     final theme = Theme.of(context);
     final running = provider.isRunning;
     final loading = provider.isStarting || provider.isStopping;
+    final musicEnabled = context.watch<FeatureRegistry>().isEnabled('music_player');
 
     return Card(
       margin: const EdgeInsets.all(16),
@@ -580,6 +620,42 @@ class _ServerCard extends StatelessWidget {
               Text('在其他设备的浏览器中打开此链接即可传输文件',
                   style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
               const SizedBox(height: 16),
+            ],
+            if (musicEnabled) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                      value: provider.sendToMusicFolder,
+                      onChanged: running
+                          ? (v) {
+                              final musicPath = context.read<MusicLibraryProvider>().musicFolderPath;
+                              provider.setSendToMusicFolder(v ?? false, musicPath);
+                            }
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: running
+                          ? () {
+                              final v = !provider.sendToMusicFolder;
+                              final musicPath = context.read<MusicLibraryProvider>().musicFolderPath;
+                              provider.setSendToMusicFolder(v, musicPath);
+                            }
+                          : null,
+                      child: Text(
+                        '直接传输音频到音乐文件夹',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
             if (provider.error != null) ...[
               Container(

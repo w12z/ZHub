@@ -15,6 +15,9 @@ abstract class AppFeature {
   /// 模块图标
   String get iconAsset;
 
+  /// 模块导航栏图标
+  IconData get icon;
+
   /// 是否默认启用（首次安装时）
   bool get enabledByDefault;
 

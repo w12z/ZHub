@@ -19,6 +19,9 @@ class WifiTransferFeature extends AppFeature {
   String get iconAsset => 'assets/icons/wifi.svg';
 
   @override
+  IconData get icon => Icons.wifi;
+
+  @override
   bool get enabledByDefault => false;
 
   late WifiTransferProvider _provider;

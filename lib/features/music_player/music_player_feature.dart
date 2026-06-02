@@ -24,6 +24,9 @@ class MusicPlayerFeature extends AppFeature {
   String get iconAsset => 'assets/icons/music.svg';
 
   @override
+  IconData get icon => Icons.music_note;
+
+  @override
   bool get enabledByDefault => false;
 
   @override

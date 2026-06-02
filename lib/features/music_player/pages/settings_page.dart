@@ -1,6 +1,8 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/eq_preset.dart';
+import '../providers/music_library_provider.dart';
 import '../providers/playlist_provider.dart';
 import '../services/audio_player_service.dart';
 import '../services/audio_routing_service.dart';
@@ -48,6 +50,8 @@ class _SettingsPageState extends State<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.only(bottom: 32),
         children: [
+          _buildMusicFolderSection(theme),
+          const Divider(height: 32),
           _buildPlayModeSection(player, theme),
           const Divider(height: 32),
           _buildEqSection(presets, theme),
@@ -56,6 +60,27 @@ class _SettingsPageState extends State<SettingsPage> {
           const Divider(height: 32),
           _buildInterruptSection(player, theme),
         ],
+      ),
+    );
+  }
+
+  // ── Music Folder ──
+
+  Widget _buildMusicFolderSection(ThemeData theme) {
+    final musicPath = context.watch<MusicLibraryProvider>().musicFolderPath;
+    return _SectionCard(
+      title: '音乐文件夹',
+      child: ListTile(
+        leading: Icon(Icons.folder_open, color: theme.colorScheme.primary),
+        title: Text(musicPath ?? '未设置'),
+        subtitle: const Text('Wi-Fi 传输可直接保存音乐到此文件夹'),
+        trailing: const Icon(Icons.edit_location_alt),
+        onTap: () async {
+          final path = await FilePicker.platform.getDirectoryPath();
+          if (path != null && context.mounted) {
+            context.read<MusicLibraryProvider>().setMusicFolderPath(path);
+          }
+        },
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/music_track.dart';
 import '../services/music_scanner.dart';
 import '../services/audio_player_service.dart';
@@ -13,10 +14,26 @@ class MusicLibraryProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
+  SharedPreferences? _prefs;
+  String? _musicFolderPath;
+
   List<MusicTrack> get allTracks => _allTracks;
   List<MusicTrack> get recentlyPlayed => List.unmodifiable(_recentlyPlayed);
   bool get isLoading => _isLoading;
   String? get error => _error;
+  String? get musicFolderPath => _musicFolderPath;
+
+  Future<void> initPrefs() async {
+    _prefs = await SharedPreferences.getInstance();
+    _musicFolderPath = _prefs!.getString('music_folder_path');
+    notifyListeners();
+  }
+
+  void setMusicFolderPath(String path) {
+    _musicFolderPath = path;
+    _prefs?.setString('music_folder_path', path);
+    notifyListeners();
+  }
 
   // ── Cache ──
 
