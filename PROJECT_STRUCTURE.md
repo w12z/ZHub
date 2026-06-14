@@ -1,7 +1,7 @@
-﻿# File Hub 项目文件结构
+﻿# ZHub 项目文件结构
 
 ```
-file_hub/
+zhub/
 ├── pubspec.yaml                  # 项目配置：名称、依赖包、SDK版本
 ├── pubspec.lock                  # 依赖精确版本锁定
 ├── analysis_options.yaml         # Dart 静态分析规则

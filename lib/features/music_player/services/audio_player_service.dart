@@ -13,13 +13,12 @@ enum AudioInterruptMode { pause, duck }
 class AudioPlayerService extends ChangeNotifier {
   static final AudioPlayerService instance = AudioPlayerService._();
   AudioPlayerService._() {
-    _started = true;
+    _audioSessionStarted = true;
     _startUnifiedPolling();
   }
 
   static const _audioChannel = MethodChannel('com.filehub/audio_focus');
   bool _audioSessionStarted = false;
-  set _started(bool v) => _audioSessionStarted = v;
 
   Future<bool> _hasOtherAudio() async {
     if (!_audioSessionStarted) return false;
@@ -82,12 +81,6 @@ class AudioPlayerService extends ChangeNotifier {
   bool _userPaused = false;
   int _tickCount = 0;
   Timer? _fadeTimer;
-
-  AudioPlayerService({AudioInterruptMode initialInterruptMode = AudioInterruptMode.pause}) {
-    _interruptMode = initialInterruptMode;
-    _started = true;
-    _startUnifiedPolling();
-  }
 
   void _startUnifiedPolling() {
     _pollTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {

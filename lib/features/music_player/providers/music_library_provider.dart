@@ -1,20 +1,25 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/key_value_store.dart';
+import '../../../core/module_services.dart';
 import '../models/music_track.dart';
 import '../services/music_scanner.dart';
 import '../services/audio_player_service.dart';
 import '../services/playlist_repository.dart';
 
-class MusicLibraryProvider extends ChangeNotifier {
+class MusicLibraryProvider extends ChangeNotifier
+    implements TargetFolderProvider {
   final MusicScanner _scanner = MusicScanner();
+  static const _prefsKey = 'music_folder_path';
+  static const Set<String> _audioExtensions = {
+    'mp3', 'flac', 'wav', 'aac', 'm4a', 'ogg', 'wma', 'opus', 'aiff',
+  };
 
   List<MusicTrack> _allTracks = [];
   final List<MusicTrack> _recentlyPlayed = [];
   bool _isLoading = false;
   String? _error;
 
-  SharedPreferences? _prefs;
   String? _musicFolderPath;
 
   List<MusicTrack> get allTracks => _allTracks;
@@ -23,15 +28,29 @@ class MusicLibraryProvider extends ChangeNotifier {
   String? get error => _error;
   String? get musicFolderPath => _musicFolderPath;
 
+  // ── TargetFolderProvider ──
+
+  @override
+  String get id => 'music';
+
+  @override
+  String get displayName => '音乐文件夹';
+
+  @override
+  String? get path => _musicFolderPath;
+
+  @override
+  Set<String> get acceptedExtensions => _audioExtensions;
+
   Future<void> initPrefs() async {
-    _prefs = await SharedPreferences.getInstance();
-    _musicFolderPath = _prefs!.getString('music_folder_path');
+    await KeyValueStore.instance.init();
+    _musicFolderPath = KeyValueStore.instance.getString(_prefsKey);
     notifyListeners();
   }
 
-  void setMusicFolderPath(String path) {
+  Future<void> setMusicFolderPath(String path) async {
     _musicFolderPath = path;
-    _prefs?.setString('music_folder_path', path);
+    await KeyValueStore.instance.setString(_prefsKey, path);
     notifyListeners();
   }
 

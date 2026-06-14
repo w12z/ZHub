@@ -43,7 +43,7 @@ class WifiTransferFeature extends AppFeature {
     }
 
     _provider = WifiTransferProvider(
-      server: WifiTransferServer(port: 8686, serveDirectory: transferDir.path),
+      server: WifiTransferServer(preferredPort: 8686, serveDirectory: transferDir.path),
     );
   }
 

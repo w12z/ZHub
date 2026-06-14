@@ -6,12 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:mime/mime.dart';
 import 'package:provider/provider.dart';
 import 'package:shelf/shelf.dart' as shelf;
-// ignore: unused_import — 实现路由时使用
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart' as shelf_router;
 
-import '../../core/feature_registry.dart';
-import '../music_player/providers/music_library_provider.dart';
+import '../../core/module_services.dart';
 
 export 'wifi_transfer_feature.dart';
 
@@ -87,34 +85,50 @@ class TransferTask {
 /// 3. 文件接收 — 解析 multipart，保存到 serveDirectory
 class WifiTransferServer {
   HttpServer? _httpServer;
-  final int port;
+  final int preferredPort;
   final String serveDirectory;
+  int? _activePort;
 
   final StreamController<TransferTask> _taskController =
       StreamController<TransferTask>.broadcast();
 
   Stream<TransferTask> get taskStream => _taskController.stream;
 
-  WifiTransferServer({this.port = 8686, required this.serveDirectory});
+  WifiTransferServer({this.preferredPort = 8686, required this.serveDirectory});
 
   bool get isRunning => _httpServer != null;
+  int? get activePort => _activePort;
+
+  static final _virtualIfacePattern = RegExp(
+    r'(?:virtual|vmware|vbox|vEthernet|WSL|Hyper-V|Loopback|Teredo|Tunnel|PPPoE|Bluetooth|ISATAP)',
+    caseSensitive: false,
+  );
 
   Future<String> get localIP async {
-    final interfaces = await NetworkInterface.list();
+    final interfaces = await NetworkInterface.list(includeLoopback: false);
+
+    NetworkInterface? bestIface;
+    String? bestAddr;
+
     for (final iface in interfaces) {
+      if (_virtualIfacePattern.hasMatch(iface.name)) continue;
+
       for (final addr in iface.addresses) {
-        if (addr.type == InternetAddressType.IPv4 &&
-            !addr.isLoopback && !addr.isLinkLocal) {
-          return addr.address;
+        if (addr.type == InternetAddressType.IPv4 && !addr.isLinkLocal) {
+          if (bestAddr == null || iface.index < bestIface!.index) {
+            bestIface = iface;
+            bestAddr = addr.address;
+          }
         }
       }
     }
-    return '127.0.0.1';
+
+    return bestAddr ?? '127.0.0.1';
   }
 
   Future<String> get serverUrl async {
     final ip = await localIP;
-    return 'http://$ip:$port';
+    return 'http://$ip:${_activePort ?? preferredPort}';
   }
 
   Future<void> start() async {
@@ -125,12 +139,27 @@ class WifiTransferServer {
     final handler = const shelf.Pipeline()
         .addMiddleware(shelf.logRequests())
         .addHandler(router.call);
-    _httpServer = await io.serve(handler, InternetAddress.anyIPv4, port);
+
+    // Try preferred port, fall back through next 9 ports.
+    Object? lastError;
+    for (int p = preferredPort; p < preferredPort + 10; p++) {
+      try {
+        _httpServer = await io.serve(handler, InternetAddress.anyIPv4, p);
+        _activePort = p;
+        return;
+      } on SocketException catch (e) {
+        lastError = e;
+        continue;
+      }
+    }
+    throw lastError ??
+        Exception('无法绑定端口 $preferredPort..${preferredPort + 9}');
   }
 
   Future<void> stop() async {
     await _httpServer?.close(force: true);
     _httpServer = null;
+    _activePort = null;
   }
 
   /// 接收上传文件（POST /upload，multipart/form-data）
@@ -389,11 +418,11 @@ class WifiTransferProvider extends ChangeNotifier {
   String? _error;
   final List<TransferTask> _transfers = [];
 
-  bool sendToMusicFolder = false;
-  String? _musicFolderPath;
-  static const _audioExtensions = [
-    'mp3', 'flac', 'wav', 'aac', 'm4a', 'ogg', 'wma', 'opus', 'aiff'
-  ];
+  /// 是否启用"音频自动转发到目标文件夹"。
+  bool autoForwardAudio = false;
+
+  /// 用户选择的目标文件夹 provider id（来自 [ModuleServices]）。
+  String? _targetFolderId;
 
   WifiTransferProvider({required WifiTransferServer server})
       : _server = server {
@@ -405,6 +434,8 @@ class WifiTransferProvider extends ChangeNotifier {
   bool get isStopping => _isStopping;
   String get serverUrl => _serverUrl;
   String? get error => _error;
+  String? get targetFolderId => _targetFolderId;
+  int? get activePort => _server.activePort;
   List<TransferTask> get transfers => List.unmodifiable(_transfers);
   int get activeCount =>
       _transfers.where((t) => t.status == TransferStatus.transferring).length;
@@ -447,7 +478,7 @@ class WifiTransferProvider extends ChangeNotifier {
       _transfers.insert(0, task);
     }
     if (task.status == TransferStatus.completed) {
-      _tryCopyToMusicFolder(task);
+      _tryForwardToTargetFolder(task);
     }
     notifyListeners();
   }
@@ -471,26 +502,40 @@ class WifiTransferProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setSendToMusicFolder(bool value, String? musicFolderPath) {
-    sendToMusicFolder = value;
-    _musicFolderPath = musicFolderPath;
+  /// 启用/禁用自动转发，并选择目标文件夹 provider。
+  void setAutoForward(bool value, {String? targetFolderId}) {
+    autoForwardAudio = value;
+    if (targetFolderId != null) _targetFolderId = targetFolderId;
     notifyListeners();
   }
 
-  bool _isAudioFile(String fileName) {
-    final ext = fileName.split('.').last.toLowerCase();
-    return _audioExtensions.contains(ext);
+  bool _matchesExtensions(String fileName, Set<String> exts) {
+    if (exts.isEmpty) return true;
+    final dot = fileName.lastIndexOf('.');
+    if (dot < 0) return false;
+    return exts.contains(fileName.substring(dot + 1).toLowerCase());
   }
 
-  void _tryCopyToMusicFolder(TransferTask task) {
-    if (!sendToMusicFolder || _musicFolderPath == null || task.savedPath == null) return;
-    if (!_isAudioFile(task.fileName)) return;
+  void _tryForwardToTargetFolder(TransferTask task) {
+    if (!autoForwardAudio || _targetFolderId == null || task.savedPath == null) {
+      return;
+    }
+    // Read the path lazily at copy time so users can change the target
+    // folder without re-toggling the checkbox.
+    final provider =
+        ModuleServices.instance.getTargetFolder(_targetFolderId!);
+    final path = provider?.path;
+    if (provider == null || path == null) return;
+    if (!_matchesExtensions(task.fileName, provider.acceptedExtensions)) {
+      return;
+    }
     try {
       final sourceFile = File(task.savedPath!);
-      final destDir = Directory(_musicFolderPath!);
+      final destDir = Directory(path);
       if (!destDir.existsSync()) destDir.createSync(recursive: true);
-      sourceFile.copySync('${destDir.path}${Platform.pathSeparator}${task.fileName}');
-    } catch (e) {
+      sourceFile.copySync(
+          '${destDir.path}${Platform.pathSeparator}${task.fileName}');
+    } catch (_) {
       // silently ignore copy failures
     }
   }
@@ -551,7 +596,7 @@ class _ServerCard extends StatelessWidget {
     final theme = Theme.of(context);
     final running = provider.isRunning;
     final loading = provider.isStarting || provider.isStopping;
-    final musicEnabled = context.watch<FeatureRegistry>().isEnabled('music_player');
+    final targetFolders = ModuleServices.instance.targetFolders;
 
     return Card(
       margin: const EdgeInsets.all(16),
@@ -621,40 +666,12 @@ class _ServerCard extends StatelessWidget {
                   style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
               const SizedBox(height: 16),
             ],
-            if (musicEnabled) ...[
+            for (final tf in targetFolders) ...[
               const SizedBox(height: 4),
-              Row(
-                children: [
-                  SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: Checkbox(
-                      value: provider.sendToMusicFolder,
-                      onChanged: running
-                          ? (v) {
-                              final musicPath = context.read<MusicLibraryProvider>().musicFolderPath;
-                              provider.setSendToMusicFolder(v ?? false, musicPath);
-                            }
-                          : null,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: running
-                          ? () {
-                              final v = !provider.sendToMusicFolder;
-                              final musicPath = context.read<MusicLibraryProvider>().musicFolderPath;
-                              provider.setSendToMusicFolder(v, musicPath);
-                            }
-                          : null,
-                      child: Text(
-                        '直接传输音频到音乐文件夹',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                  ),
-                ],
+              _AutoForwardRow(
+                provider: provider,
+                target: tf,
+                running: running,
               ),
             ],
             if (provider.error != null) ...[
@@ -702,6 +719,69 @@ class _ServerCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AutoForwardRow extends StatelessWidget {
+  final WifiTransferProvider provider;
+  final TargetFolderProvider target;
+  final bool running;
+  const _AutoForwardRow({
+    required this.provider,
+    required this.target,
+    required this.running,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasPath = target.path != null;
+    final selected =
+        provider.targetFolderId == target.id && provider.autoForwardAudio;
+    final canToggle = running && hasPath;
+
+    void toggle() {
+      if (!hasPath) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('请先在${target.displayName}设置中选择路径'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+      provider.setAutoForward(!selected, targetFolderId: target.id);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: Checkbox(
+              value: selected,
+              onChanged: canToggle ? (_) => toggle() : null,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: GestureDetector(
+              onTap: canToggle ? toggle : null,
+              child: Text(
+                hasPath
+                    ? '自动转发到${target.displayName}'
+                    : '自动转发到${target.displayName}（未配置路径）',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: hasPath ? null : theme.colorScheme.outline,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -827,30 +907,46 @@ class _EmptyTransferList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(isRunning ? Icons.cloud_upload_outlined : Icons.wifi_off,
-                size: 72, color: Colors.grey.shade300),
-            const SizedBox(height: 16),
-            Text(isRunning ? '等待传输' : '服务未启动',
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(color: Colors.grey.shade600)),
-            const SizedBox(height: 8),
-            Text(
-              isRunning
-                  ? '在其他设备浏览器中打开上方链接，即可上传或下载文件'
-                  : '启动服务后，同一局域网内的设备可通过浏览器传输文件',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: Colors.grey.shade500),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxHeight < 240;
+        final iconSize = compact ? 40.0 : 72.0;
+        return SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.all(compact ? 16 : 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                        isRunning
+                            ? Icons.cloud_upload_outlined
+                            : Icons.wifi_off,
+                        size: iconSize,
+                        color: Colors.grey.shade300),
+                    SizedBox(height: compact ? 8 : 16),
+                    Text(isRunning ? '等待传输' : '服务未启动',
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(color: Colors.grey.shade600)),
+                    const SizedBox(height: 8),
+                    Text(
+                      isRunning
+                          ? '在其他设备浏览器中打开上方链接，即可上传或下载文件'
+                          : '启动服务后，同一局域网内的设备可通过浏览器传输文件',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: Colors.grey.shade500),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

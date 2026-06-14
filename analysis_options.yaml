@@ -5,3 +5,15 @@ linter:
     prefer_const_constructors: true
     prefer_const_declarations: true
     avoid_print: false
+    unawaited_futures: true
+    cancel_subscriptions: true
+    close_sinks: true
+    prefer_final_locals: true
+    directives_ordering: true
+
+analyzer:
+  errors:
+    unused_import: error
+    dead_code: error
+    missing_required_param: error
+    unawaited_futures: warning

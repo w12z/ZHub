@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'core/feature_registry.dart';
+import 'core/key_value_store.dart';
+import 'core/module_services.dart';
 import 'core/core_hub.dart';
 import 'features/wifi_transfer/wifi_transfer_feature.dart';
 import 'features/pdf_viewer/pdf_viewer_feature.dart';
@@ -13,7 +15,10 @@ import 'features/music_player/services/audio_player_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final registry = FeatureRegistry();
+  await KeyValueStore.instance.init();
+
+  final registry = FeatureRegistry.instance;
+  await registry.restore();
   registry.register(WifiTransferFeature());
   registry.register(PdfViewerFeature());
   registry.register(MusicPlayerFeature());
@@ -37,11 +42,12 @@ class ZHubApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) {
           final provider = MusicLibraryProvider();
           provider.initPrefs();
+          ModuleServices.instance.registerTargetFolder(provider);
           return provider;
         }),
         ChangeNotifierProvider(create: (_) => PlaylistProvider()),
         ChangeNotifierProvider.value(value: AudioPlayerService.instance),
-        ChangeNotifierProvider.value(value: FeatureRegistry()),
+        ChangeNotifierProvider.value(value: FeatureRegistry.instance),
         ChangeNotifierProvider(create: (_) => PdfProvider()),
       ],
       child: MaterialApp(
@@ -112,7 +118,7 @@ class _HomePageState extends State<HomePage> {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => ChangeNotifierProvider.value(
-                    value: FeatureRegistry(),
+                    value: FeatureRegistry.instance,
                     child: const ModuleManagerPage(),
                   ),
                 ),

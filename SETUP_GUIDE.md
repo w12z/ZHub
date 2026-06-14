@@ -1,4 +1,4 @@
-﻿# File Hub - 环境搭建指南
+﻿# ZHub - 环境搭建指南
 
 ## 1. 准备工具
 
@@ -6,7 +6,7 @@
 |------|---------|------|
 | Git | https://git-scm.com | 已有可跳过 |
 | Flutter SDK | https://flutter.dev | 解压到 C:\flutter |
-| VS 生成工具 2026 | https://visualstudio.microsoft.com/zh-hans/downloads/#build-tools-for-visual-studio-2026 | 安装时勾选「使用 C++ 的桌面开发」，不需要装完整 VS |
+| VS 生成工具 2022 | https://visualstudio.microsoft.com/zh-hans/downloads/#build-tools-for-visual-studio-2022 | 安装时勾选「使用 C++ 的桌面开发」，不需要装完整 VS |
 | NuGet | https://www.nuget.org/downloads | 下载 nuget.exe 手动放到 %LOCALAPPDATA%\Pub\Cache\bin\ |
 
 ## 2. 配置步骤
@@ -36,8 +36,8 @@ flutter doctor
 
 ```powershell
 cd 你的工作目录
-git clone <仓库地址> file_hub
-cd file_hub
+git clone <仓库地址> zhub
+cd zhub
 flutter pub get
 
 # Edge 浏览器运行（最快，推荐验证用）
