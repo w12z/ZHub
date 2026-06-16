@@ -57,8 +57,7 @@ class EqualizerService {
   Future<void> _activateFilter() async {
     if (_filterActive) return;
     try {
-      final eq = SoLoud.instance.filters.parametricEqFilter;
-      eq.numBands.value = EqPreset.bandCount.toDouble();
+      final eq = SoLoud.instance.filters.equalizerFilter;
       eq.activate();
       _filterActive = true;
       await _applyAllGains();
@@ -70,7 +69,7 @@ class EqualizerService {
   Future<void> _deactivateFilter() async {
     if (!_filterActive) return;
     try {
-      SoLoud.instance.filters.parametricEqFilter.deactivate();
+      SoLoud.instance.filters.equalizerFilter.deactivate();
     } catch (_) {}
     _filterActive = false;
   }
@@ -97,20 +96,33 @@ class EqualizerService {
   Future<void> _applyBandGain(int band) async {
     if (!_filterActive || !_enabled) return;
     try {
-      SoLoud.instance.filters.parametricEqFilter
-          .bandGain(band)
-          .value = _dbToGain(_gains[band]);
+      final eq = SoLoud.instance.filters.equalizerFilter;
+      final value = _dbToGain(_gains[band]);
+      _setBandValue(eq, band, value);
     } catch (_) {}
   }
 
   Future<void> _applyAllGains() async {
     if (!_filterActive || !_enabled) return;
     try {
-      final eq = SoLoud.instance.filters.parametricEqFilter;
+      final eq = SoLoud.instance.filters.equalizerFilter;
       for (int i = 0; i < EqPreset.bandCount; i++) {
-        eq.bandGain(i).value = _dbToGain(_gains[i]);
+        _setBandValue(eq, i, _dbToGain(_gains[i]));
       }
     } catch (_) {}
+  }
+
+  void _setBandValue(dynamic eq, int band, double value) {
+    switch (band) {
+      case 0: eq.band1.value = value; break;
+      case 1: eq.band2.value = value; break;
+      case 2: eq.band3.value = value; break;
+      case 3: eq.band4.value = value; break;
+      case 4: eq.band5.value = value; break;
+      case 5: eq.band6.value = value; break;
+      case 6: eq.band7.value = value; break;
+      case 7: eq.band8.value = value; break;
+    }
   }
 
   // ── Presets ──

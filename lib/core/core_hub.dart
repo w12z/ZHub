@@ -14,6 +14,13 @@ import '../features/pdf_viewer/pdf_viewer_feature.dart';
 // Services
 // ============================================================
 
+/// Must be set by main() before FileBrowserProvider is created.
+String? _iosDocumentsPath;
+
+void setDocumentsPath(String path) {
+  _iosDocumentsPath = path;
+}
+
 class FileService {
   Future<List<FileItem>> listDirectory(String path) async {
     if (kIsWeb) return [];
@@ -73,7 +80,7 @@ class FileService {
         await Process.run('cmd', ['/c', 'start', '', path], runInShell: true);
       } else if (Platform.isMacOS) {
         await Process.run('open', [path]);
-      } else {
+      } else if (Platform.isLinux) {
         await Process.run('xdg-open', [path]);
       }
       return true;
@@ -108,12 +115,14 @@ class FileService {
         '$home${sep}Videos',
       ];
 
-  String get _homePath =>
-      kIsWeb
-          ? '/'
-          : Platform.environment['USERPROFILE'] ??
-              Platform.environment['HOME'] ??
-              '/';
+  String get _homePath {
+    if (kIsWeb) return '/';
+    if (Platform.isIOS && _iosDocumentsPath != null) return _iosDocumentsPath!;
+    final home = Platform.environment['USERPROFILE'] ??
+        Platform.environment['HOME'] ??
+        '/';
+    return home;
+  }
 
   String get homePath => _homePath;
 }
@@ -124,10 +133,24 @@ class DirectoryEntry {
   const DirectoryEntry({required this.path, required this.name});
 }
 
-class QuickAccessService {
+class QuickAccessService extends ChangeNotifier {
   static QuickAccessService? _instance;
   factory QuickAccessService() => _instance ??= QuickAccessService._();
   QuickAccessService._();
+
+  final List<String> _paths = [];
+
+  Future<void> _ensureLoaded() async {
+    if (_paths.isNotEmpty) return;
+    try {
+      final file = await _configFile;
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        final List<dynamic> json = jsonDecode(content);
+        _paths.addAll(json.cast<String>());
+      }
+    } catch (_) {}
+  }
 
   File? _file;
   Future<File> get _configFile async {
@@ -138,45 +161,40 @@ class QuickAccessService {
   }
 
   Future<List<String>> getPaths() async {
-    if (kIsWeb) return [];
-    try {
-      final file = await _configFile;
-      if (!await file.exists()) return [];
-      final content = await file.readAsString();
-      final List<dynamic> json = jsonDecode(content);
-      return json.cast<String>();
-    } catch (_) {
-      return [];
-    }
+    await _ensureLoaded();
+    return List.unmodifiable(_paths);
   }
 
   Future<void> add(String path) async {
     if (kIsWeb) return;
-    final paths = await getPaths();
-    if (!paths.contains(path)) {
-      paths.insert(0, path);
-      await _save(paths);
+    await _ensureLoaded();
+    if (!_paths.contains(path)) {
+      _paths.insert(0, path);
+      await _save();
+      notifyListeners();
     }
   }
 
   Future<void> remove(String path) async {
     if (kIsWeb) return;
-    final paths = await getPaths();
-    paths.remove(path);
-    await _save(paths);
+    await _ensureLoaded();
+    if (_paths.remove(path)) {
+      await _save();
+      notifyListeners();
+    }
   }
 
   Future<bool> contains(String path) async {
     if (kIsWeb) return false;
-    final paths = await getPaths();
-    return paths.contains(path);
+    await _ensureLoaded();
+    return _paths.contains(path);
   }
 
-  Future<void> _save(List<String> paths) async {
+  Future<void> _save() async {
     if (kIsWeb) return;
     final file = await _configFile;
     await file.parent.create(recursive: true);
-    await file.writeAsString(jsonEncode(paths));
+    await file.writeAsString(jsonEncode(_paths));
   }
 }
 
@@ -198,7 +216,7 @@ class FileBrowserProvider extends ChangeNotifier {
   bool get loading => _loading;
   String? get error => _error;
   List<DirectoryEntry> get commonDirs => _commonDirs;
-  bool get canGoUp => kIsWeb ? false : Directory(_currentPath).parent.path != _currentPath;
+  bool get canGoUp => !kIsWeb && _currentPath != _service.homePath && Directory(_currentPath).parent.path != _currentPath;
   String get currentName => _currentPath.isEmpty
       ? 'ZHub'
       : FileItem.nameFromPath(_currentPath);
@@ -263,6 +281,7 @@ class QuickAccessProvider extends ChangeNotifier {
 
   QuickAccessProvider() {
     load();
+    _service.addListener(() => load());
   }
 
   Future<void> load() async {
@@ -313,25 +332,54 @@ class QuickAccessProvider extends ChangeNotifier {
 // ============================================================
 
 class FileBrowserPage extends StatefulWidget {
-  const FileBrowserPage({super.key});
+  final String? initialPath;
+  const FileBrowserPage({super.key, this.initialPath});
 
   @override
   State<FileBrowserPage> createState() => _FileBrowserPageState();
 }
 
 class _FileBrowserPageState extends State<FileBrowserPage> {
+  FileBrowserProvider? _provider;
+  String? _originalPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _provider = context.read<FileBrowserProvider>();
+    if (widget.initialPath != null) {
+      _originalPath = _provider!.currentPath;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _provider?.navigateTo(widget.initialPath!);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_originalPath != null) {
+      _provider?.navigateTo(_originalPath!);
+    }
+    super.dispose();
+  }
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<FileBrowserProvider>();
+    final canPop = Navigator.of(context).canPop();
     return Scaffold(
       appBar: AppBar(
         title: Text(provider.currentName),
-        leading: provider.canGoUp
+        leading: canPop
             ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => provider.navigateUp(),
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.of(context).pop(),
               )
-            : null,
+            : provider.canGoUp
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => provider.navigateUp(),
+                  )
+                : null,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -679,11 +727,21 @@ class QuickAccessPage extends StatelessWidget {
                 onPressed: () => provider.unpin(item.path),
               ),
               onTap: () {
-                final ext = item.name.split('.').last.toLowerCase();
-                if (!item.isDirectory && ext == 'pdf') {
-                  PdfViewerFeature.openPdf(context, item.path, item.name);
+                if (item.isDirectory) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => FileBrowserPage(initialPath: item.path),
+                    ),
+                  );
                 } else {
-                  _showItemInfo(context, item);
+                  final ext = item.name.split('.').last.toLowerCase();
+                  if (ext == 'pdf') {
+                    PdfViewerFeature.openPdf(context, item.path, item.name);
+                  } else if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+                    FileService().openFile(item.path);
+                  } else {
+                    _showItemInfo(context, item);
+                  }
                 }
               },
             ),

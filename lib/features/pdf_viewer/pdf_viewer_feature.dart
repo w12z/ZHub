@@ -58,14 +58,8 @@ class PdfViewerFeature extends AppFeature {
       final bytes = result.files.single.bytes;
       if (bytes == null) return;
       if (!context.mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => PdfViewerPage(
-            filePath: '',
-            fileName: fileName,
-            bytes: Uint8List.fromList(bytes),
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Web PDF preview not supported')),
       );
     } else {
       final path = result.files.single.path;

@@ -244,7 +244,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
 
     return ReorderableListView.builder(
       itemCount: tracks.length,
-      onReorderItem: (oldIndex, newIndex) {
+      onReorder: (oldIndex, newIndex) {
         final pl = context.read<PlaylistProvider>().playlists[_currentPage];
         if (pl.id != null) {
           context.read<PlaylistProvider>().reorderPlaylist(

@@ -189,15 +189,23 @@ class WifiTransferServer {
         final fileKey = _extractField(disp, 'filename');
         if (fileKey == null || fileKey.isEmpty) continue;
 
-        final safeName = DateTime.now().millisecondsSinceEpoch.toString();
-        final ext = fileKey.contains('.') ? fileKey.substring(fileKey.lastIndexOf('.')) : '';
-        savedName = '$safeName$ext';
+        // Use original filename, append "副本" if duplicate
+        String name = fileKey;
+        String filePath = '$serveDirectory${Platform.pathSeparator}$name';
+        while (File(filePath).existsSync()) {
+          final dot = name.lastIndexOf('.');
+          final base = dot > 0 ? name.substring(0, dot) : name;
+          final ext = dot > 0 ? name.substring(dot) : '';
+          name = '$base 副本$ext';
+          filePath = '$serveDirectory${Platform.pathSeparator}$name';
+        }
+        savedName = name;
 
-        final file = File('$serveDirectory${Platform.pathSeparator}$savedName');
+        final file = File(filePath);
         final sink = file.openWrite();
 
         final task = TransferTask(
-          id: safeName,
+          id: savedName,
           fileName: fileKey,
           fileSize: 0,
           direction: TransferDirection.upload,

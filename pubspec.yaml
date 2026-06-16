@@ -34,12 +34,11 @@ dependencies:
   # Utilities
   intl: ^0.19.0
   shared_preferences: ^2.3.4
+  url_launcher: ^6.3.1
 
   sqflite_common_ffi: 2.3.2
-  flutter_soloud: ^4.0.6
-
-  # PDF Viewer
-  pdfx: ^2.9.2
+  flutter_soloud: ^3.5.4
+  flutter_cached_pdfview: ^0.4.4
 
 dev_dependencies:
   flutter_test:

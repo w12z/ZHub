@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_soloud/flutter_soloud.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -46,9 +47,11 @@ class MusicPlayerFeature extends AppFeature {
 
   @override
   Future<void> init() async {
-    // SQLite FFI init (sync DLL load, brief)
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    // SQLite FFI init (desktop only, not on iOS/Android)
+    if (!Platform.isIOS && !Platform.isAndroid) {
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+    }
 
     // Run independent heavy init in parallel
     final repo = PlaylistRepository.instance;

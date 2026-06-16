@@ -516,7 +516,7 @@ class AudioPlayerService extends ChangeNotifier {
     try {
       _currentSource = await SoLoud.instance.loadFile(path);
       _duration = SoLoud.instance.getLength(_currentSource!);
-      _currentHandle = SoLoud.instance.play(_currentSource!, volume: _volume);
+      _currentHandle = await SoLoud.instance.play(_currentSource!, volume: _volume);
       _isPlaying = true;
       notifyListeners();
     } catch (e) {

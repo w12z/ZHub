@@ -7,12 +7,12 @@ class EqPreset {
   final bool isBuiltIn;
   final DateTime createdAt;
 
-  static const int bandCount = 10;
+  static const int bandCount = 8;
   static const double minGain = -12.0;
   static const double maxGain = 12.0;
 
   static const List<double> bandFrequencies = [
-    32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000,
+    32, 64, 125, 250, 500, 1000, 2000, 4000,
   ];
 
   static String formatFrequency(double hz) {
@@ -85,55 +85,55 @@ class EqPreset {
   static List<EqPreset> get builtInPresets => [
         EqPreset(
           name: 'Flat',
-          gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          gains: [0, 0, 0, 0, 0, 0, 0, 0],
           isBuiltIn: true,
           createdAt: _epoch,
         ),
         EqPreset(
           name: 'Rock',
-          gains: [5, 4, 2, 0, -1, 0, 1, 3, 4, 4],
+          gains: [5, 4, 2, 0, -1, 0, 1, 3],
           isBuiltIn: true,
           createdAt: _epoch,
         ),
         EqPreset(
           name: 'Pop',
-          gains: [-1, 2, 4, 3, 0, -1, -1, 1, 3, 4],
+          gains: [-1, 2, 4, 3, 0, -1, -1, 1],
           isBuiltIn: true,
           createdAt: _epoch,
         ),
         EqPreset(
           name: 'Jazz',
-          gains: [4, 2, 0, 0, -1, -1, 0, 2, 3, 4],
+          gains: [4, 2, 0, 0, -1, -1, 0, 2],
           isBuiltIn: true,
           createdAt: _epoch,
         ),
         EqPreset(
           name: 'Classical',
-          gains: [5, 4, 3, 0, -1, -1, 0, 2, 4, 5],
+          gains: [5, 4, 3, 0, -1, -1, 0, 2],
           isBuiltIn: true,
           createdAt: _epoch,
         ),
         EqPreset(
           name: 'Hip-Hop',
-          gains: [5, 4, 1, 2, -1, -1, 1, -1, 2, 3],
+          gains: [5, 4, 1, 2, -1, -1, 1, -1],
           isBuiltIn: true,
           createdAt: _epoch,
         ),
         EqPreset(
           name: 'Electronic',
-          gains: [4, 3, 1, 0, -2, 1, 2, 4, 5, 5],
+          gains: [4, 3, 1, 0, -2, 1, 2, 4],
           isBuiltIn: true,
           createdAt: _epoch,
         ),
         EqPreset(
           name: 'Bass Boost',
-          gains: [6, 5, 3, 1, 0, 0, 0, 0, 0, 0],
+          gains: [6, 5, 3, 1, 0, 0, 0, 0],
           isBuiltIn: true,
           createdAt: _epoch,
         ),
         EqPreset(
           name: 'Vocal Boost',
-          gains: [0, 0, -1, -2, -1, 2, 4, 2, 1, 0],
+          gains: [0, 0, -1, -2, -1, 2, 4, 2],
           isBuiltIn: true,
           createdAt: _epoch,
         ),

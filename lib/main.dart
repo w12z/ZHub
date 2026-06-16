@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'core/feature_registry.dart';
 import 'core/key_value_store.dart';
@@ -16,6 +18,14 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await KeyValueStore.instance.init();
+
+  // Always create user directories inside Documents
+  final docDir = await getApplicationDocumentsDirectory();
+  setDocumentsPath(docDir.path);
+  for (final name in ['transfer', 'Music']) {
+    final d = Directory('${docDir.path}/$name');
+    if (!await d.exists()) await d.create(recursive: true);
+  }
 
   final registry = FeatureRegistry.instance;
   await registry.restore();
