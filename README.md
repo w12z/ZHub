@@ -255,3 +255,55 @@ flutter analyze
 | ✏️ 修改 | `mini_player.dart` / `now_playing_page.dart` / `music_library_page.dart` / `playlist_detail_page.dart`（`PlayerStateProvider` → `AudioPlayerService`） |
 
 **总计：-486 行 / +244 行，净减少 242 行，删除 1 个文件，消除 2 个冗余 Timer。**
+
+---
+
+### 2026-06-14 — iOS 适配与功能修复
+
+**Bug 修复**
+
+| # | 问题 | 修复 |
+|---|------|------|
+| ① | `sqflite_common_ffi` 在 iOS 上导致数据库崩溃 | 仅桌面端启用 FFI，iOS/Android 使用原生 sqflite |
+| ② | `homePath` 在 iOS 真机指向错误路径，文件浏览为空 | 通过 `setDocumentsPath()` 注入 App Documents 目录 |
+| ③ | Documents 目录可回退到上级，看到系统垃圾文件夹 | `canGoUp` 限制不能退出 Documents 根目录 |
+| ④ | WiFi 传输文件改名（时间戳），丢失原始文件名 | 保留原始文件名，重名加「副本」 |
+| ⑤ | 快速访问点击文件夹不导航，只弹信息框 | 点击文件夹导航到 FileBrowserPage 并恢复路径 |
+| ⑥ | 从快速访问进入文件夹后关闭，文件标签页残留子目录 | dispose 时恢复原始路径 |
+| ⑦ | PDF 预览无法加载（pdfx 兼容性问题） | 替换为 `flutter_cached_pdfview`，支持本地 fromPath |
+| ⑧ | App 图标为 Flutter 默认图标 | 从 `assets/icons/ico.png` 生成所有尺寸 iOS 图标 |
+| ⑨ | AppDelegate 使用不存在的 `FlutterImplicitEngineDelegate` | 简化为标准 `FlutterAppDelegate`，内联 AudioFocusHandler |
+
+**Dart SDK 兼容性**
+
+| # | 改动 | 说明 |
+|---|------|------|
+| ① | `flutter_soloud` 4.0.6 → 3.5.4 | Dart SDK 3.9.2 不满足 4.x 的 >=3.11.0 要求 |
+| ② | `parametricEqFilter` → `equalizerFilter` | 3.5.4 API 不同，8 段均衡器 |
+| ③ | `play()` 返回值加 `await` | 3.5.4 返回 `Future<SoundHandle>` |
+| ④ | `onReorderItem` → `onReorder` | API 名称变更 |
+| ⑤ | `bandCount` 10 → 8 | 匹配 3.5.4 均衡器段数 |
+
+**文件变更**
+
+| 操作 | 文件 |
+|------|------|
+| ✏️ 修改 | `lib/main.dart`（注入 Documents 路径、创建 transfer/Music 目录） |
+| ✏️ 修改 | `lib/core/core_hub.dart`（iOS 路径、canGoUp 限制、QuickAccess 导航、PDF 打开逻辑） |
+| ✏️ 修改 | `lib/features/wifi_transfer/wifi_transfer.dart`（保留原始文件名、重复加副本） |
+| ✏️ 修改 | `lib/features/wifi_transfer/wifi_transfer_feature.dart`（移除重复 auto-pin） |
+| ✏️ 修改 | `lib/features/music_player/music_player_feature.dart`（iOS 跳过 FFI） |
+| ✏️ 修改 | `lib/features/music_player/models/eq_preset.dart`（10→8 段，预设截断） |
+| ✏️ 修改 | `lib/features/music_player/services/equalizer_service.dart`（适配 3.5.4 API） |
+| ✏️ 修改 | `lib/features/music_player/services/audio_player_service.dart`（await play） |
+| ✏️ 修改 | `lib/features/music_player/pages/playlist_detail_page.dart`（onReorder） |
+| ✏️ 替换 | `lib/features/pdf_viewer/pdf_viewer_page.dart`（pdfx → flutter_cached_pdfview） |
+| ✏️ 替换 | `lib/features/pdf_viewer/pdf_viewer_body_native.dart`（pdfx → flutter_cached_pdfview） |
+| ✏️ 修改 | `ios/Runner/AppDelegate.swift`（简化，内联 AudioFocusHandler） |
+| ✏️ 替换 | `ios/Runner/Assets.xcassets/AppIcon.appiconset/*`（替换为 ico.png） |
+| ✏️ 修改 | `ios/Runner.xcodeproj/project.pbxproj`（Bundle ID） |
+| ✏️ 修改 | `pubspec.yaml`（降级 flutter_soloud、移除 pdfx、增加 flutter_cached_pdfview） |
+| 🆕 新增 | `ios/Podfile`、`ios/Podfile.lock` |
+| ✏️ 修改 | `.gitignore`（iOS/windows 生成文件） |
+
+**总计：修复 9 项 Bug，适配 5 项 SDK 兼容性问题，修改 20 个文件。**
