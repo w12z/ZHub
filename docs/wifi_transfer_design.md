@@ -26,12 +26,8 @@ WifiTransferFeature (AppFeature)
 
 ```
 lib/features/wifi_transfer/
-├── wifi_transfer.dart              barrel 导出
-├── wifi_transfer_feature.dart      AppFeature 实现
-├── wifi_transfer_models.dart       TransferTask 等数据模型
-├── wifi_transfer_server.dart       shelf HTTP 服务端（骨架，需实现）
-├── wifi_transfer_provider.dart     状态管理
-└── wifi_transfer_page.dart         UI 页面
+├── wifi_transfer.dart              # 完整实现：Server + Provider + UI + HTML 上传页（合并）
+└── wifi_transfer_feature.dart      # AppFeature 实现
 ```
 
 ## UI 设计
@@ -65,33 +61,26 @@ POST /upload             →  接收文件（multipart/form-data，字段名 "fi
 GET  /files/<filename>   →  下载指定文件（支持 Range 断点续传）
 ```
 
-## 待实现列表（你的工作）
+## 实现状态
 
-### 高优先级
+### 已完成
 
-| # | 任务 | 文件 | 难度 |
-|---|------|------|------|
-| 1 | **本机 IP 检测** — 遍历 NetworkInterface 获取局域网 IPv4 | `wifi_transfer_server.dart` → `localIP` | ⭐ |
-| 2 | **路由注册 + 服务器启动** — 注册 GET/POST 路由，`io.serve()` | `wifi_transfer_server.dart` → `start()` | ⭐⭐ |
-| 3 | **文件接收逻辑** — 解析 multipart，流式写入磁盘，回调进度 | `wifi_transfer_server.dart` → `_handleUpload()` | ⭐⭐⭐ |
-| 4 | **HTML 上传页面** — 带样式表单，支持多文件拖拽 | `wifi_transfer_server.dart` → `_handleIndex()` | ⭐⭐ |
-| 5 | **serveDirectory 传入** — 将核心模块的文件目录传给 Server | `wifi_transfer_feature.dart` 构造函数 | ⭐ |
-
-### 中优先级
-
-| # | 任务 | 文件 |
+| # | 任务 | 说明 |
 |---|------|------|
-| 6 | **文件下载** — 流式返回，支持 Range 断点续传 | `_handleDownload()` |
-| 7 | **进度回调完善** — 上传/下载过程中持续更新 TransferTask | `_handleUpload()` / `_handleDownload()` |
-| 8 | **多文件同时传输** — 支持并发上传/下载 | Server + Provider |
+| 1 | **本机 IP 检测** | 遍历 NetworkInterface 获取局域网 IPv4，过滤虚拟网卡 |
+| 2 | **路由注册 + 服务器启动** | GET / POST /upload，端口 8686 起始，失败自动递增 |
+| 3 | **文件接收逻辑** | 解析 multipart，流式写入磁盘，回调进度 |
+| 4 | **HTML 上传页面** | 带样式表单，支持多文件拖拽 |
+| 5 | **serveDirectory 传入** | Documents/transfer 目录作为接收目录 |
+| 6 | **文件名保留** | 保留原始文件名，重名自动追加「副本」 |
 
-### 低优先级
+### 低优先级（未实现）
 
 | # | 任务 | 备注 |
 |---|------|------|
-| 9 | **二维码生成** — 在 UI 中显示连接二维码 | 需 `qr_flutter` 包 |
-| 10 | **mDNS/Bonjour 发现** | iOS 需付费开发者账号 |
-| 11 | **HTTPS 支持** | 自签证书 + 用户手动信任 |
+| 1 | **二维码生成** — 在 UI 中显示连接二维码 | 需 `qr_flutter` 包 |
+| 2 | **mDNS/Bonjour 发现** | iOS 需付费开发者账号 |
+| 3 | **HTTPS 支持** | 自签证书 + 用户手动信任 |
 
 ## iOS 注意事项
 
@@ -102,24 +91,23 @@ GET  /files/<filename>   →  下载指定文件（支持 Range 断点续传）
 | 本地网络权限 | iOS 14+ 首次访问局域网会弹窗 | `Info.plist` 添加 `NSLocalNetworkUsageDescription` |
 | `dart:io` 可用 | shelf 基于 `dart:io HttpServer`，iOS 上可用 | 无需额外处理 |
 
-## 快速开始（Windows 开发）
+## 快速开始
 
-```powershell
-# 编译运行
-flutter run -d windows
+```bash
+flutter pub get
+flutter run --release -d <device-id>
 
 # 启用 WiFi 传输模块
-# 在 main.dart 中将 WifiTransferFeature 的 enabledByDefault 改为 true
-# 或通过模块管理页面手动启用
+# 模块管理页面（右上角扩展图标）→ 启用 Wi-Fi 传输
+# 或将 WifiTransferFeature 的 enabledByDefault 改为 true
 ```
 
 ## 依赖（已就绪）
 
 ```yaml
 shelf: ^1.4.2          # HTTP server 框架
-shelf_router: ^1.1.4    # 路由
-shelf_static: ^1.1.3    # 静态文件服务
-network_info_plus: ^6.1.2  # 网络信息
+shelf_router: ^1.1.4   # 路由
+mime: ^2.0.0           # MIME 类型解析（multipart）
 ```
 
 ## 参考

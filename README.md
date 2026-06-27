@@ -1,6 +1,6 @@
 # ZHub
 
-多模块文件管理应用，采用可插拔架构。当前在 Windows 桌面开发，目标平台为 iOS。
+多模块文件管理应用，采用可插拔架构。支持 iOS 与 Windows 桌面双平台。
 
 ## 功能
 
@@ -8,8 +8,8 @@
 |---|---|---|
 | 文件浏览 | 核心（不可卸载） | 已完成 |
 | 快速访问 | 核心（不可卸载） | 已完成 |
-| Wi-Fi 传输 | 可插拔模块 | 基本实现 |
-| PDF 预览 | 可插拔模块 | 待实现 |
+| Wi-Fi 传输 | 可插拔模块 | 已完成 |
+| PDF 预览 | 可插拔模块 | 已完成（`flutter_cached_pdfview`） |
 | 音乐播放 | 可插拔模块 | 基本实现（默认关闭） |
 
 ## 架构
@@ -44,12 +44,12 @@ lib/features/music_player/
 ├── services/
 │   ├── audio_player_service.dart 播放引擎（ChangeNotifier 单例）
 │   ├── audio_routing_service.dart输出设备切换
-│   ├── equalizer_service.dart    10段均衡器（全局单例）
+│   ├── equalizer_service.dart    8段均衡器（全局单例）
 │   ├── music_player_settings.dart集中化用户设置
 │   ├── music_scanner.dart        音乐文件扫描
 │   └── playlist_repository.dart  SQLite 数据仓库
 ├── models/
-│   ├── eq_preset.dart            均衡器预设模型（9个内置预设）
+│   ├── eq_preset.dart            均衡器预设模型（8个内置预设）
 │   └── music_track.dart          曲目模型 + Playlist + QueuePlaylist
 ├── providers/
 │   ├── music_library_provider.dart
@@ -72,6 +72,15 @@ lib/features/music_player/
 ## 运行
 
 ```bash
+# 获取依赖
+flutter pub get
+
+# iOS 真机（需配置签名）
+flutter run --release -d <device-id>
+
+# iOS 模拟器
+flutter run -d <simulator-id>
+
 # Windows 桌面
 flutter run -d windows
 

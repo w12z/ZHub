@@ -1,6 +1,77 @@
 ﻿# ZHub - 环境搭建指南
 
-## 1. 准备工具
+## iOS 开发（主要目标平台）
+
+### 1. 准备工具
+
+| 工具 | 下载地址 | 备注 |
+|------|---------|------|
+| Git | https://git-scm.com | 已有可跳过 |
+| Flutter SDK | https://flutter.dev | 解压到本地目录 |
+| Xcode | https://developer.apple.com/xcode/ | App Store 安装，需 iOS 平台组件 |
+| CocoaPods | https://cocoapods.org | iOS 依赖管理（`sudo gem install cocoapods`） |
+
+### 2. 配置步骤
+
+```bash
+# 1. 添加 Flutter 到 PATH
+export PATH="$HOME/flutter/bin:$PATH"
+
+# 2. 检查环境
+flutter doctor
+# 确保 Flutter、Xcode 两项打勾
+
+# 3. 安装 iOS 平台组件
+# 打开 Xcode → Settings → Components → 下载 iOS 平台
+# 或命令行：xcodebuild -downloadPlatform iOS
+
+# 4. CocoaPods（如未安装）
+sudo gem install cocoapods
+```
+
+### 3. 签名配置（真机调试）
+
+```bash
+# 1. Xcode → Settings → Accounts → 添加 Apple ID（免费即可）
+# 2. 打开项目
+open ios/Runner.xcworkspace
+# 3. 选择 Runner target → Signing & Capabilities → 选择 Team
+# 4. 如 Bundle ID 冲突，改为唯一值（当前：com.zhub.app.mydev）
+```
+
+### 4. 克隆并运行
+
+```bash
+git clone https://github.com/w12z/ZHub.git zhub
+cd zhub
+flutter pub get
+
+# iOS 真机（需签名）
+flutter run --release -d <device-id>
+
+# iOS 模拟器
+flutter run -d <simulator-id>
+
+# 查看可用设备
+flutter devices
+```
+
+### 5. 常见问题
+
+| 问题 | 解决 |
+|------|------|
+| `Rosetta 2` 未安装 | `softwareupdate --install-rosetta --agree-to-license` |
+| `Could not call ptrace` | 真机用 `--release` 模式运行 |
+| Keychain 反复弹窗 | 输入密码后点「始终允许」 |
+| 本地网络无法访问 | 设置 → 隐私 → 本地网络 → 允许 ZHub |
+| App 闪退 | 设置 → 通用 → VPN与设备管理 → 信任开发者证书 |
+| 图标不更新 | 删除 App 后重新安装 |
+
+---
+
+## Windows 桌面开发
+
+### 1. 准备工具
 
 | 工具 | 下载地址 | 备注 |
 |------|---------|------|
@@ -9,7 +80,7 @@
 | VS 生成工具 2022 | https://visualstudio.microsoft.com/zh-hans/downloads/#build-tools-for-visual-studio-2022 | 安装时勾选「使用 C++ 的桌面开发」，不需要装完整 VS |
 | NuGet | https://www.nuget.org/downloads | 下载 nuget.exe 手动放到 %LOCALAPPDATA%\Pub\Cache\bin\ |
 
-## 2. 配置步骤
+### 2. 配置步骤
 
 ```powershell
 # 1. 添加 Flutter 到 PATH
@@ -29,14 +100,14 @@ flutter config --enable-web
 
 # 5. 检查环境
 flutter doctor
-# 确保 Flutter 和 Visual Studio 两项打 勾
+# 确保 Flutter 和 Visual Studio 两项打勾
 ```
 
-## 3. 克隆并运行项目
+### 3. 克隆并运行项目
 
 ```powershell
 cd 你的工作目录
-git clone <仓库地址> zhub
+git clone https://github.com/w12z/ZHub.git zhub
 cd zhub
 flutter pub get
 
@@ -50,7 +121,7 @@ flutter run -d windows
 # 开发中热重载：按 r  退出：按 q
 ```
 
-## 4. 常见问题
+### 4. 常见问题
 
 | 问题 | 解决 |
 |------|------|
